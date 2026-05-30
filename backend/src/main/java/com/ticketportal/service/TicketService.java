@@ -1,24 +1,34 @@
 package com.ticketportal.service;
 
 import com.ticketportal.dto.request.CreateTicketRequest;
+import com.ticketportal.dto.request.TicketExplorerCriteria;
 import com.ticketportal.dto.request.UpdateTicketRequest;
 import com.ticketportal.dto.response.*;
 import com.ticketportal.entity.*;
+import com.ticketportal.entity.enums.ProjectStatus;
 import com.ticketportal.entity.enums.TicketPriority;
 import com.ticketportal.entity.enums.TicketStatus;
 import com.ticketportal.entity.enums.TicketType;
 import com.ticketportal.exception.ResourceNotFoundException;
 import com.ticketportal.exception.UnauthorizedException;
 import com.ticketportal.repository.*;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -120,6 +130,119 @@ public class TicketService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return toPagedResponse(ticketRepository.findAllTicketsGlobal(
             projectId, status, priority, assigneeId, searchTerm, pageable));
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<TicketResponse> exploreTickets(int page, int size, String sortBy,
+            String sortDir, TicketExplorerCriteria criteria) {
+        Sort sort = Sort.by("asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC,
+            normalizeSort(sortBy));
+        PageRequest pageable = PageRequest.of(page, size, sort);
+        return toPagedResponse(ticketRepository.findAll(buildExplorerSpec(criteria), pageable));
+    }
+
+    private Specification<Ticket> buildExplorerSpec(TicketExplorerCriteria c) {
+        return (root, query, cb) -> {
+            if (query != null) query.distinct(true);
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (c == null) return cb.conjunction();
+
+            if (c.getSearch() != null && !c.getSearch().isBlank()) {
+                String term = "%" + c.getSearch().trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                    cb.like(cb.lower(root.get("title")), term),
+                    cb.like(cb.lower(root.get("ticketNumber")), term),
+                    cb.like(cb.lower(root.get("description")), term)
+                ));
+            }
+
+            if (hasValues(c.getProjectIds())) predicates.add(root.get("project").get("id").in(c.getProjectIds()));
+            if (hasValues(c.getCategoryIds())) predicates.add(root.get("project").get("category").get("id").in(c.getCategoryIds()));
+            if (hasValues(c.getProjectStatuses())) predicates.add(root.get("project").get("status").in(c.getProjectStatuses()));
+            if (hasValues(c.getStatuses())) predicates.add(root.get("status").in(c.getStatuses()));
+            if (hasValues(c.getPriorities())) predicates.add(root.get("priority").in(c.getPriorities()));
+            if (hasValues(c.getTypes())) predicates.add(root.get("type").in(c.getTypes()));
+            if (hasValues(c.getReporterIds())) predicates.add(root.get("reporter").get("id").in(c.getReporterIds()));
+
+            if (hasValues(c.getAssigneeIds()) && Boolean.TRUE.equals(c.getUnassigned())) {
+                predicates.add(cb.or(root.get("assignee").get("id").in(c.getAssigneeIds()), cb.isNull(root.get("assignee"))));
+            } else if (hasValues(c.getAssigneeIds())) {
+                predicates.add(root.get("assignee").get("id").in(c.getAssigneeIds()));
+            } else if (Boolean.TRUE.equals(c.getUnassigned())) {
+                predicates.add(cb.isNull(root.get("assignee")));
+            }
+
+            if (hasValues(c.getLabelIds())) {
+                predicates.add(root.join("labels", JoinType.LEFT).get("id").in(c.getLabelIds()));
+            }
+
+            if (hasValues(c.getSprintIds()) && Boolean.TRUE.equals(c.getBacklog())) {
+                predicates.add(cb.or(root.get("sprint").get("id").in(c.getSprintIds()), cb.isNull(root.get("sprint"))));
+            } else if (hasValues(c.getSprintIds())) {
+                predicates.add(root.get("sprint").get("id").in(c.getSprintIds()));
+            } else if (Boolean.TRUE.equals(c.getBacklog())) {
+                predicates.add(cb.isNull(root.get("sprint")));
+            }
+
+            addLocalDateRange(predicates, cb, root.get("dueDate"), c.getDueFrom(), c.getDueTo());
+            addDateTimeRange(predicates, cb, root.get("createdAt"), c.getCreatedFrom(), c.getCreatedTo());
+            addDateTimeRange(predicates, cb, root.get("updatedAt"), c.getUpdatedFrom(), c.getUpdatedTo());
+            addDateTimeRange(predicates, cb, root.get("resolvedAt"), c.getResolvedFrom(), c.getResolvedTo());
+
+            if (Boolean.TRUE.equals(c.getOverdue())) {
+                predicates.add(cb.lessThan(root.get("dueDate"), LocalDate.now()));
+                predicates.add(root.get("status").in(List.of(TicketStatus.DONE, TicketStatus.CLOSED, TicketStatus.CANCELLED)).not());
+            }
+
+            addIntegerRange(predicates, cb, root.get("estimatedHours"), c.getEstimatedMin(), c.getEstimatedMax());
+            addIntegerRange(predicates, cb, root.get("actualHours"), c.getActualMin(), c.getActualMax());
+
+            if (c.getHasAttachments() != null) {
+                predicates.add(c.getHasAttachments() ? cb.isNotEmpty(root.get("attachments")) : cb.isEmpty(root.get("attachments")));
+            }
+            if (c.getHasComments() != null) {
+                predicates.add(c.getHasComments() ? cb.isNotEmpty(root.get("comments")) : cb.isEmpty(root.get("comments")));
+            }
+            if (c.getHasCommits() != null && query != null) {
+                Subquery<Long> sq = query.subquery(Long.class);
+                var commit = sq.from(TicketCommit.class);
+                sq.select(commit.get("id")).where(cb.equal(commit.get("ticket").get("id"), root.get("id")));
+                predicates.add(c.getHasCommits() ? cb.exists(sq) : cb.not(cb.exists(sq)));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private String normalizeSort(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) return "createdAt";
+        return switch (sortBy) {
+            case "ticketNumber", "title", "status", "priority", "type", "dueDate", "updatedAt", "resolvedAt" -> sortBy;
+            default -> "createdAt";
+        };
+    }
+
+    private boolean hasValues(List<?> values) {
+        return values != null && !values.isEmpty();
+    }
+
+    private void addLocalDateRange(List<Predicate> predicates, CriteriaBuilder cb,
+            Path<LocalDate> path, LocalDate from, LocalDate to) {
+        if (from != null) predicates.add(cb.greaterThanOrEqualTo(path, from));
+        if (to != null) predicates.add(cb.lessThanOrEqualTo(path, to));
+    }
+
+    private void addDateTimeRange(List<Predicate> predicates, CriteriaBuilder cb,
+            Path<LocalDateTime> path, LocalDate from, LocalDate to) {
+        if (from != null) predicates.add(cb.greaterThanOrEqualTo(path, from.atStartOfDay()));
+        if (to != null) predicates.add(cb.lessThanOrEqualTo(path, to.plusDays(1).atStartOfDay().minusNanos(1)));
+    }
+
+    private void addIntegerRange(List<Predicate> predicates, CriteriaBuilder cb,
+            Path<Integer> path, Integer min, Integer max) {
+        if (min != null) predicates.add(cb.greaterThanOrEqualTo(path, min));
+        if (max != null) predicates.add(cb.lessThanOrEqualTo(path, max));
     }
 
     @Transactional(readOnly = true)

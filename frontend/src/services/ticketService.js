@@ -21,6 +21,21 @@ export const ticketService = {
     return res.data.data   // returns enriched list with commitIds
   },
 
+  getExplorerOptions: async () => {
+    const res = await api.get('/tickets/explorer/options')
+    return res.data.data
+  },
+
+  exploreTickets: async (params = {}) => {
+    const res = await api.get('/tickets/explorer', { params })
+    return res.data.data
+  },
+
+  exportExplorerTickets: async (params = {}) => {
+    const res = await api.get('/tickets/explorer/export', { params })
+    return res.data.data
+  },
+
   getAllTickets: async (params = {}) => {
     const res = await api.get('/tickets', { params })
     return res.data.data

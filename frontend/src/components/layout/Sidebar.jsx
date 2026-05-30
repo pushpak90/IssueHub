@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, FolderKanban, Ticket, Users, UsersRound,
-  BarChart3, Settings, LogOut, ChevronLeft, ChevronRight, Zap, ShieldCheck, LayoutGrid
+  BarChart3, Settings, LogOut, ChevronLeft, ChevronRight, Zap, ShieldCheck, LayoutGrid,
+  SearchCode
 } from 'lucide-react'
 import { toggleSidebar } from '../../store/slices/uiSlice'
 import { logoutUser } from '../../store/slices/authSlice'
@@ -19,8 +20,9 @@ const navItems = [
 ]
 
 const managerItems = [
-  { to: '/users',    icon: Users,    label: 'Users' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/ticket-explorer', icon: SearchCode, label: 'Ticket Explorer' },
+  { to: '/users',           icon: Users,      label: 'Users' },
+  { to: '/settings',        icon: Settings,   label: 'Settings' },
 ]
 
 const adminOnlyItems = [

@@ -11,6 +11,7 @@ import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import Tickets from './pages/Tickets'
 import TicketDetail from './pages/TicketDetail'
+import TicketExplorer from './pages/TicketExplorer'
 import Users from './pages/Users'
 import Teams from './pages/Teams'
 import Reports from './pages/Reports'
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
+          <Route path="ticket-explorer" element={<TicketExplorer />} />
           <Route path="users" element={<Users />} />
           <Route path="teams" element={<Teams />} />
           <Route path="reports" element={<Reports />} />

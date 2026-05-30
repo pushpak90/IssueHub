@@ -1,0 +1,39 @@
+# =========================
+# React / Vite
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.production.local
+
+# =========================
+# Spring Boot / Gradle
+# =========================
+backend/build/
+backend/.gradle/
+backend/out/
+
+# Application logs
+backend/logs/
+*.log
+
+# =========================
+# IDE Files
+# =========================
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Temporary Files
+# =========================
+*.tmp
+*.swp

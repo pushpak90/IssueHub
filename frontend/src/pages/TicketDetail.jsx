@@ -336,9 +336,11 @@ function TimeLogSection({ ticketId, currentUser }) {
   )
 }
 
-// ── Commits Section (view — collapsible like DB Scripts) ─────────────────────
+// Commits Section
 function CommitsViewSection({ ticketId, currentUser }) {
   const queryClient = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [commitHash, setCommitHash] = useState('')
 
   const { data: commits = [] } = useQuery({
     queryKey: ['commits', ticketId],
@@ -346,62 +348,115 @@ function CommitsViewSection({ ticketId, currentUser }) {
     enabled: !!ticketId,
   })
 
+  const addMutation = useMutation({
+    mutationFn: () => commitService.addCommit(ticketId, {
+      commitHash: commitHash.trim(),
+    }),
+    onSuccess: () => {
+      toast.success('Commit linked')
+      queryClient.invalidateQueries(['commits', ticketId])
+      queryClient.invalidateQueries(['history', ticketId])
+      setCommitHash('')
+      setShowForm(false)
+    },
+    onError: (e) => toast.error(e.response?.data?.message || 'Failed to link commit'),
+  })
+
   const removeMutation = useMutation({
     mutationFn: (cid) => commitService.removeCommit(ticketId, cid),
-    onSuccess: () => { toast.success('Commit removed'); queryClient.invalidateQueries(['commits', ticketId]); queryClient.invalidateQueries(['history', ticketId]) },
+    onSuccess: () => {
+      toast.success('Commit removed')
+      queryClient.invalidateQueries(['commits', ticketId])
+      queryClient.invalidateQueries(['history', ticketId])
+    },
   })
+
+  const handleAdd = () => {
+    const hash = commitHash.trim()
+    if (!hash) return
+    if (commits.some(c => c.commitHash === hash)) {
+      toast.error('Commit already linked')
+      return
+    }
+    addMutation.mutate()
+  }
 
   const copy = (hash) => { navigator.clipboard.writeText(hash); toast.success('Copied!') }
 
-  if (commits.length === 0) return null
-
   return (
     <div>
-      <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 text-sm mb-3">
-        <GitCommit className="h-4 w-4 text-orange-500" />
-        Git Commits
-        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold px-1.5 dark:bg-orange-900/20 dark:text-orange-400">
-          {commits.length}
-        </span>
-        <span className="text-xs text-gray-400 font-normal ml-1">— manage in Edit Ticket</span>
-      </h3>
-      <div className="space-y-2">
-        {commits.map(c => (
-          <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-3 py-2.5">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <code className="text-xs font-mono font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded shrink-0">
-                {c.shortHash || c.commitHash?.slice(0, 7)}
-              </code>
-              {c.branch && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 font-medium shrink-0">
-                  🌿 {c.branch}
-                </span>
-              )}
-              {c.commitMessage && (
-                <span className="text-xs text-gray-600 dark:text-gray-400 truncate">{c.commitMessage}</span>
-              )}
-              <span className="text-[10px] text-gray-400 shrink-0">by {c.addedBy}</span>
-            </div>
-            <div className="flex items-center gap-1 shrink-0 ml-2">
-              <button onClick={() => copy(c.commitHash)}
-                className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 transition-colors" title="Copy hash">
-                <Copy className="h-3 w-3" />
-              </button>
-              {c.addedById === currentUser?.id && (
-                <button onClick={() => removeMutation.mutate(c.id)}
-                  className="flex h-6 w-6 items-center justify-center rounded text-gray-300 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors">
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 text-sm">
+          <GitCommit className="h-4 w-4 text-orange-500" />
+          Git Commits
+          {commits.length > 0 && <span className="text-xs text-gray-400">({commits.length})</span>}
+        </h3>
+        <button onClick={() => setShowForm(f => !f)}
+          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 font-medium transition-colors">
+          {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {showForm ? 'Cancel' : 'Add Commit'}
+        </button>
       </div>
+
+      {showForm && (
+        <div className="mb-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-3">
+          <label className="block text-xs text-gray-500 mb-1">Commit ID *</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={commitHash}
+              onChange={e => setCommitHash(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd() } }}
+              placeholder="Paste full commit ID"
+              className="input h-9 flex-1 font-mono text-sm"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!commitHash.trim() || addMutation.isPending}
+              className="btn-primary h-9 px-4 text-xs disabled:opacity-50 sm:w-32"
+            >
+              {addMutation.isPending ? 'Saving...' : 'Add'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {commits.length === 0 ? (
+        <div className="text-center py-5">
+          <GitCommit className="h-8 w-8 text-gray-200 dark:text-gray-700 mx-auto mb-2" />
+          <p className="text-xs text-gray-400">No commits linked yet</p>
+          <p className="text-xs text-gray-300 mt-1">Add commit IDs that belong to this ticket</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {commits.map(c => (
+            <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-3 py-2.5">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <code className="min-w-0 break-all rounded bg-orange-50 px-2 py-1 font-mono text-xs font-bold text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                  {c.commitHash}
+                </code>
+                <span className="text-[10px] text-gray-400 shrink-0">by {c.addedBy}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                <button onClick={() => copy(c.commitHash)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 transition-colors" title="Copy hash">
+                  <Copy className="h-3 w-3" />
+                </button>
+                {c.addedById === currentUser?.id && (
+                  <button onClick={() => removeMutation.mutate(c.id)}
+                    className="flex h-6 w-6 items-center justify-center rounded text-gray-300 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Attachments Section ───────────────────────────────────────────────────────
+// Attachments Section ───────────────────────────────────────────────────────
 function AttachmentsSection({ ticketId }) {
   const queryClient  = useQueryClient()
   const fileInputRef = useRef(null)
