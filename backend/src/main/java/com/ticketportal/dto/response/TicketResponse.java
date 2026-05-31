@@ -1,8 +1,5 @@
 package com.ticketportal.dto.response;
 
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -20,9 +17,9 @@ public class TicketResponse {
     private String ticketNumber;
     private String title;
     private String description;
-    private TicketStatus status;
-    private TicketPriority priority;
-    private TicketType type;
+    private String status;
+    private String priority;
+    private String type;
     private Long projectId;
     private String projectName;
     private UserResponse reporter;

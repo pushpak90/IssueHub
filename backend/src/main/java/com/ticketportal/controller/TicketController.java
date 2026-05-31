@@ -6,9 +6,6 @@ import com.ticketportal.dto.request.UpdateTicketRequest;
 import com.ticketportal.dto.response.*;
 import com.ticketportal.entity.Ticket;
 import com.ticketportal.entity.TicketCommit;
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import com.ticketportal.entity.enums.ProjectStatus;
 import com.ticketportal.repository.*;
 import com.ticketportal.service.TicketService;
@@ -23,10 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 
 @RestController
@@ -91,7 +87,7 @@ public class TicketController {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MANAGER')")
     @Operation(summary = "Export advanced explorer results")
-    public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> exportExplorerTickets(
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> exportExplorerTickets(
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(required = false) String search,
@@ -184,8 +180,8 @@ public class TicketController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) TicketStatus status,
-            @RequestParam(required = false) TicketPriority priority,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String search) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -195,17 +191,17 @@ public class TicketController {
     @PatchMapping("/bulk")
     @Transactional
     @Operation(summary = "Bulk update tickets — change status/priority/assignee for multiple tickets")
-    public ResponseEntity<ApiResponse<String>> bulkUpdate(@RequestBody java.util.Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<String>> bulkUpdate(@RequestBody Map<String, Object> body) {
         @SuppressWarnings("unchecked")
-        java.util.List<Integer> rawIds = (java.util.List<Integer>) body.get("ticketIds");
+        List<Integer> rawIds = (List<Integer>) body.get("ticketIds");
         if (rawIds == null || rawIds.isEmpty())
             return ResponseEntity.badRequest().body(ApiResponse.error("ticketIds is required"));
 
-        com.ticketportal.dto.request.UpdateTicketRequest patch = new com.ticketportal.dto.request.UpdateTicketRequest();
+        UpdateTicketRequest patch = new UpdateTicketRequest();
         if (body.containsKey("status") && body.get("status") != null)
-            patch.setStatus(TicketStatus.valueOf((String) body.get("status")));
+            patch.setStatus((String) body.get("status"));
         if (body.containsKey("priority") && body.get("priority") != null)
-            patch.setPriority(TicketPriority.valueOf((String) body.get("priority")));
+            patch.setPriority((String) body.get("priority"));
         if (body.containsKey("assigneeId") && body.get("assigneeId") != null) {
             Object raw = body.get("assigneeId");
             patch.setAssigneeId(raw instanceof Number ? ((Number) raw).longValue() : Long.parseLong(raw.toString()));
@@ -222,50 +218,14 @@ public class TicketController {
     @GetMapping("/export")
     @Transactional(readOnly = true)
     @Operation(summary = "Export tickets as enriched list with commit IDs (for CSV download)")
-    public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> exportTickets(
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> exportTickets(
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) TicketStatus status,
-            @RequestParam(required = false) TicketPriority priority,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String search) {
-
-        // Fetch up to 10000 tickets with same role-based filtering
         var paged = ticketService.getAllTicketsGlobal(0, 10000, projectId, status, priority, assigneeId, search);
-        java.util.List<TicketResponse> ticketResponses = paged.getContent();
-
-        // Batch-fetch commits for all tickets (avoids N+1)
-        java.util.List<Long> ids = ticketResponses.stream()
-            .map(TicketResponse::getId).collect(java.util.stream.Collectors.toList());
-        java.util.List<Ticket> ticketEntities = ticketService.findAllByIds(ids);
-        java.util.List<TicketCommit> allCommits = commitRepository.findByTicketIn(ticketEntities);
-
-        // Group commits by ticket id
-        java.util.Map<Long, java.util.List<String>> commitMap = allCommits.stream()
-            .collect(java.util.stream.Collectors.groupingBy(
-                c -> c.getTicket().getId(),
-                java.util.stream.Collectors.mapping(TicketCommit::getCommitHash,
-                    java.util.stream.Collectors.toList())
-            ));
-
-        // Build enriched export rows
-        java.util.List<java.util.Map<String, Object>> result = ticketResponses.stream().map(t -> {
-            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
-            row.put("ticketNumber",   t.getTicketNumber());
-            row.put("title",          t.getTitle());
-            row.put("status",         t.getStatus() != null ? t.getStatus().name() : "");
-            row.put("priority",       t.getPriority() != null ? t.getPriority().name() : "");
-            row.put("type",           t.getType() != null ? t.getType().name() : "");
-            row.put("projectName",    t.getProjectName());
-            row.put("assignee",       t.getAssignee() != null ? t.getAssignee().getFullName() : "");
-            row.put("reporter",       t.getReporter() != null ? t.getReporter().getFullName() : "");
-            row.put("dueDate",        t.getDueDate() != null ? t.getDueDate().toString() : "");
-            row.put("estimatedHours", t.getEstimatedHours() != null ? t.getEstimatedHours().toString() : "");
-            row.put("commitIds",      String.join("; ", commitMap.getOrDefault(t.getId(), java.util.List.of())));
-            row.put("createdAt",      t.getCreatedAt() != null ? t.getCreatedAt().toString() : "");
-            return row;
-        }).collect(java.util.stream.Collectors.toList());
-
-        return ResponseEntity.ok(ApiResponse.success(result));
+        return ResponseEntity.ok(ApiResponse.success(toExportRows(paged.getContent())));
     }
 
     @PostMapping
@@ -293,9 +253,9 @@ public class TicketController {
             @PathVariable Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) TicketStatus status,
-            @RequestParam(required = false) TicketPriority priority,
-            @RequestParam(required = false) TicketType type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String search) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -336,6 +296,8 @@ public class TicketController {
         return ResponseEntity.ok(ApiResponse.success(ticketService.getTicketAttachments(id)));
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private TicketExplorerCriteria buildCriteria(String search, String projectIds, String categoryIds,
             String projectStatuses, String statuses, String priorities, String types, String assigneeIds,
             String reporterIds, String labelIds, String sprintIds, Boolean backlog, Boolean overdue,
@@ -348,9 +310,9 @@ public class TicketController {
         c.setProjectIds(parseLongList(projectIds));
         c.setCategoryIds(parseLongList(categoryIds));
         c.setProjectStatuses(parseEnumList(projectStatuses, ProjectStatus.class));
-        c.setStatuses(parseEnumList(statuses, TicketStatus.class));
-        c.setPriorities(parseEnumList(priorities, TicketPriority.class));
-        c.setTypes(parseEnumList(types, TicketType.class));
+        c.setStatuses(parseStringList(statuses));
+        c.setPriorities(parseStringList(priorities));
+        c.setTypes(parseStringList(types));
         c.setAssigneeIds(parseLongList(assigneeIds));
         c.setReporterIds(parseLongList(reporterIds));
         c.setLabelIds(parseLongList(labelIds));
@@ -379,54 +341,56 @@ public class TicketController {
     private List<Long> parseLongList(String csv) {
         if (csv == null || csv.isBlank()) return List.of();
         return Arrays.stream(csv.split(","))
-            .map(String::trim)
-            .filter(s -> !s.isBlank())
-            .map(Long::valueOf)
+            .map(String::trim).filter(s -> !s.isBlank())
+            .map(Long::valueOf).collect(Collectors.toList());
+    }
+
+    private List<String> parseStringList(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        return Arrays.stream(csv.split(","))
+            .map(String::trim).filter(s -> !s.isBlank())
             .collect(Collectors.toList());
     }
 
     private <E extends Enum<E>> List<E> parseEnumList(String csv, Class<E> type) {
         if (csv == null || csv.isBlank()) return List.of();
         return Arrays.stream(csv.split(","))
-            .map(String::trim)
-            .filter(s -> !s.isBlank())
-            .map(s -> Enum.valueOf(type, s))
-            .collect(Collectors.toList());
+            .map(String::trim).filter(s -> !s.isBlank())
+            .map(s -> Enum.valueOf(type, s)).collect(Collectors.toList());
     }
 
-    private List<Map<String, Object>> toExportRows(List<TicketResponse> ticketResponses) {
-        if (ticketResponses.isEmpty()) return List.of();
-        List<Long> ids = ticketResponses.stream().map(TicketResponse::getId).collect(Collectors.toList());
-        List<Ticket> ticketEntities = ticketService.findAllByIds(ids);
-        List<TicketCommit> allCommits = commitRepository.findByTicketIn(ticketEntities);
+    private List<Map<String, Object>> toExportRows(List<TicketResponse> tickets) {
+        if (tickets.isEmpty()) return List.of();
+        List<Long> ids = tickets.stream().map(TicketResponse::getId).collect(Collectors.toList());
+        List<Ticket> entities = ticketService.findAllByIds(ids);
+        List<TicketCommit> allCommits = commitRepository.findByTicketIn(entities);
         Map<Long, List<String>> commitMap = allCommits.stream()
             .collect(Collectors.groupingBy(
                 c -> c.getTicket().getId(),
                 Collectors.mapping(TicketCommit::getCommitHash, Collectors.toList())
             ));
 
-        return ticketResponses.stream().map(t -> {
+        return tickets.stream().map(t -> {
             Map<String, Object> row = new java.util.LinkedHashMap<>();
-            row.put("ticketNumber", t.getTicketNumber());
-            row.put("title", t.getTitle());
-            row.put("status", t.getStatus() != null ? t.getStatus().name() : "");
-            row.put("priority", t.getPriority() != null ? t.getPriority().name() : "");
-            row.put("type", t.getType() != null ? t.getType().name() : "");
-            row.put("projectName", t.getProjectName());
-            row.put("assignee", t.getAssignee() != null ? t.getAssignee().getFullName() : "");
-            row.put("reporter", t.getReporter() != null ? t.getReporter().getFullName() : "");
-            row.put("dueDate", t.getDueDate() != null ? t.getDueDate().toString() : "");
-            row.put("estimatedHours", t.getEstimatedHours() != null ? t.getEstimatedHours().toString() : "");
-            row.put("actualHours", t.getActualHours() != null ? t.getActualHours().toString() : "");
-            row.put("labels", t.getLabels() != null
-                ? t.getLabels().stream().map(LabelResponse::getName).collect(Collectors.joining("; "))
-                : "");
-            row.put("commentCount", t.getCommentCount());
+            row.put("ticketNumber",    t.getTicketNumber());
+            row.put("title",           t.getTitle());
+            row.put("status",          t.getStatus() != null ? t.getStatus() : "");
+            row.put("priority",        t.getPriority() != null ? t.getPriority() : "");
+            row.put("type",            t.getType() != null ? t.getType() : "");
+            row.put("projectName",     t.getProjectName());
+            row.put("assignee",        t.getAssignee() != null ? t.getAssignee().getFullName() : "");
+            row.put("reporter",        t.getReporter() != null ? t.getReporter().getFullName() : "");
+            row.put("dueDate",         t.getDueDate() != null ? t.getDueDate().toString() : "");
+            row.put("estimatedHours",  t.getEstimatedHours() != null ? t.getEstimatedHours().toString() : "");
+            row.put("actualHours",     t.getActualHours() != null ? t.getActualHours().toString() : "");
+            row.put("labels",          t.getLabels() != null
+                ? t.getLabels().stream().map(LabelResponse::getName).collect(Collectors.joining("; ")) : "");
+            row.put("commentCount",    t.getCommentCount());
             row.put("attachmentCount", t.getAttachmentCount());
-            row.put("commitIds", String.join("; ", commitMap.getOrDefault(t.getId(), List.of())));
-            row.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : "");
-            row.put("updatedAt", t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : "");
-            row.put("resolvedAt", t.getResolvedAt() != null ? t.getResolvedAt().toString() : "");
+            row.put("commitIds",       String.join("; ", commitMap.getOrDefault(t.getId(), List.of())));
+            row.put("createdAt",       t.getCreatedAt() != null ? t.getCreatedAt().toString() : "");
+            row.put("updatedAt",       t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : "");
+            row.put("resolvedAt",      t.getResolvedAt() != null ? t.getResolvedAt().toString() : "");
             return row;
         }).collect(Collectors.toList());
     }

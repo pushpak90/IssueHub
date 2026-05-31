@@ -10,6 +10,7 @@ import { relationService } from '../services/relationService'
 import { timeLogService } from '../services/timeLogService'
 import { ticketScriptService } from '../services/ticketScriptService'
 import { commitService } from '../services/commitService'
+import { configService } from '../services/configService'
 import { getStatusConfig, getPriorityConfig, getTypeConfig, formatDate, timeAgo, getInitials } from '../utils/helpers'
 import TicketForm from '../components/tickets/TicketForm'
 import MentionTextarea from '../components/common/MentionTextarea'
@@ -774,6 +775,21 @@ function DetailsSidebar({ ticket, users, onUpdate }) {
   const [editingField, setEditingField] = useState(null)
   const [draftHours, setDraftHours] = useState('')
 
+  // Fetch dynamic statuses for this project (falls back to global)
+  const { data: statuses = [] } = useQuery({
+    queryKey: ['ticket-statuses', ticket?.projectId ?? 'global'],
+    queryFn: () => configService.getStatuses(ticket?.projectId),
+    enabled: true,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Fetch dynamic priorities
+  const { data: priorities = [] } = useQuery({
+    queryKey: ['ticket-priorities'],
+    queryFn: configService.getPriorities,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const Field = ({ icon: Icon, label, children, fieldKey }) => (
     <div className={`flex items-start justify-between gap-2 py-2
       border-b border-gray-50 dark:border-gray-800 last:border-0
@@ -802,14 +818,24 @@ function DetailsSidebar({ ticket, users, onUpdate }) {
             className="input text-xs h-7 text-right"
             onChange={e => { onUpdate({ status: e.target.value }); setEditingField(null) }}
             onBlur={() => setEditingField(null)}>
-            {['TODO','IN_PROGRESS','IN_REVIEW','TESTING','DONE','CLOSED','ON_HOLD','CANCELLED'].map(s => (
-              <option key={s} value={s}>{getStatusConfig(s).label}</option>
+            {(statuses.length > 0
+              ? statuses
+              : [{ name: ticket.status, displayName: ticket.status }]
+            ).map(s => (
+              <option key={s.name} value={s.name}>{s.displayName}</option>
             ))}
           </select>
         ) : (
-          <span className={`badge text-xs ${getStatusConfig(ticket.status).className}`}>
-            {getStatusConfig(ticket.status).label}
-          </span>
+          (() => {
+            const cfg = statuses.find(s => s.name === ticket.status)
+            const label = cfg?.displayName || getStatusConfig(ticket.status).label
+            const cls = getStatusConfig(ticket.status).className
+            return (
+              <span className={`badge text-xs ${cls}`} style={cfg?.color ? { backgroundColor: cfg.color + '20', color: cfg.textColor || cfg.color } : undefined}>
+                {label}
+              </span>
+            )
+          })()
         )}
       </Field>
 
@@ -820,14 +846,24 @@ function DetailsSidebar({ ticket, users, onUpdate }) {
             className="input text-xs h-7"
             onChange={e => { onUpdate({ priority: e.target.value }); setEditingField(null) }}
             onBlur={() => setEditingField(null)}>
-            {['CRITICAL','HIGH','MEDIUM','LOW'].map(p => (
-              <option key={p} value={p}>{getPriorityConfig(p).label}</option>
+            {(priorities.length > 0
+              ? priorities
+              : [{ name: ticket.priority, displayName: ticket.priority }]
+            ).map(p => (
+              <option key={p.name} value={p.name}>{p.displayName}</option>
             ))}
           </select>
         ) : (
-          <span className={`badge text-xs ${getPriorityConfig(ticket.priority).className}`}>
-            {getPriorityConfig(ticket.priority).label}
-          </span>
+          (() => {
+            const cfg = priorities.find(p => p.name === ticket.priority)
+            const label = cfg?.displayName || getPriorityConfig(ticket.priority).label
+            const cls = getPriorityConfig(ticket.priority).className
+            return (
+              <span className={`badge text-xs ${cls}`}>
+                {label}
+              </span>
+            )
+          })()
         )}
       </Field>
 

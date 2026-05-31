@@ -1,7 +1,5 @@
 package com.ticketportal.dto.request;
 
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -25,9 +23,9 @@ public class CreateTicketRequest {
 
     private String description;
 
-    private TicketPriority priority = TicketPriority.MEDIUM;
+    private String priority = "MEDIUM";
 
-    private TicketType type = TicketType.TASK;
+    private String type = "TASK";
 
     private Long assigneeId;
 

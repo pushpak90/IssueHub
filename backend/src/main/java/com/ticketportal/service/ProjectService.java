@@ -150,8 +150,7 @@ public class ProjectService {
 
     public ProjectResponse toResponse(Project project) {
         long total = ticketRepository.countByProject(project);
-        long open = ticketRepository.countByProjectAndStatus(project,
-            com.ticketportal.entity.enums.TicketStatus.DONE) ;
+        long open = ticketRepository.countByProjectAndStatus(project, "DONE");
 
         return ProjectResponse.builder()
             .id(project.getId())

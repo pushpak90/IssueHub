@@ -3,9 +3,6 @@ package com.ticketportal.repository;
 import com.ticketportal.entity.Project;
 import com.ticketportal.entity.Ticket;
 import com.ticketportal.entity.User;
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,7 +13,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -26,7 +22,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     Page<Ticket> findByProject(Project project, Pageable pageable);
 
-    List<Ticket> findByProjectAndStatus(Project project, TicketStatus status);
+    List<Ticket> findByProjectAndStatus(Project project, String status);
 
     Page<Ticket> findByAssignee(User assignee, Pageable pageable);
 
@@ -41,9 +37,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
         "LOWER(t.ticketNumber) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Ticket> findTicketsWithFilters(
         @Param("project") Project project,
-        @Param("status") TicketStatus status,
-        @Param("priority") TicketPriority priority,
-        @Param("type") TicketType type,
+        @Param("status") String status,
+        @Param("priority") String priority,
+        @Param("type") String type,
         @Param("assigneeId") Long assigneeId,
         @Param("search") String search,
         Pageable pageable);
@@ -69,8 +65,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
         "LOWER(t.ticketNumber) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Ticket> findAllTicketsGlobal(
         @Param("projectId") Long projectId,
-        @Param("status") TicketStatus status,
-        @Param("priority") TicketPriority priority,
+        @Param("status") String status,
+        @Param("priority") String priority,
         @Param("assigneeId") Long assigneeId,
         @Param("search") String search,
         Pageable pageable);
@@ -83,5 +79,5 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     Long countByProject(Project project);
 
-    Long countByProjectAndStatus(Project project, TicketStatus status);
+    Long countByProjectAndStatus(Project project, String status);
 }

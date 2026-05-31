@@ -6,9 +6,6 @@ import com.ticketportal.dto.request.UpdateTicketRequest;
 import com.ticketportal.dto.response.*;
 import com.ticketportal.entity.*;
 import com.ticketportal.entity.enums.ProjectStatus;
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import com.ticketportal.exception.ResourceNotFoundException;
 import com.ticketportal.exception.UnauthorizedException;
 import com.ticketportal.repository.*;
@@ -47,6 +44,9 @@ public class TicketService {
     private final UserService userService;
     private final NotificationService notificationService;
 
+    // "Final" statuses — tickets in these states are considered resolved
+    private static final List<String> FINAL_STATUSES = List.of("DONE", "CLOSED", "CANCELLED");
+
     @Transactional
     public TicketResponse createTicket(CreateTicketRequest request) {
         User currentUser = userService.getCurrentUser();
@@ -61,8 +61,8 @@ public class TicketService {
             .ticketNumber(ticketNumber)
             .title(request.getTitle())
             .description(request.getDescription())
-            .priority(request.getPriority() != null ? request.getPriority() : TicketPriority.MEDIUM)
-            .type(request.getType() != null ? request.getType() : TicketType.TASK)
+            .priority(request.getPriority() != null ? request.getPriority() : "MEDIUM")
+            .type(request.getType() != null ? request.getType() : "TASK")
             .project(project)
             .reporter(currentUser)
             .dueDate(request.getDueDate())
@@ -110,7 +110,7 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public PagedResponse<TicketResponse> getTicketsForProject(Long projectId, int page, int size,
-            TicketStatus status, TicketPriority priority, TicketType type,
+            String status, String priority, String type,
             Long assigneeId, String search) {
         Project project = projectRepository.findById(projectId)
             .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
@@ -123,9 +123,8 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public PagedResponse<TicketResponse> getAllTicketsGlobal(int page, int size,
-            Long projectId, TicketStatus status, TicketPriority priority,
+            Long projectId, String status, String priority,
             Long assigneeId, String search) {
-        // assigneeId is fully controlled by the caller — no forced override
         String searchTerm = (search != null && !search.isBlank()) ? search : "";
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return toPagedResponse(ticketRepository.findAllTicketsGlobal(
@@ -192,7 +191,7 @@ public class TicketService {
 
             if (Boolean.TRUE.equals(c.getOverdue())) {
                 predicates.add(cb.lessThan(root.get("dueDate"), LocalDate.now()));
-                predicates.add(root.get("status").in(List.of(TicketStatus.DONE, TicketStatus.CLOSED, TicketStatus.CANCELLED)).not());
+                predicates.add(root.get("status").in(FINAL_STATUSES).not());
             }
 
             addIntegerRange(predicates, cb, root.get("estimatedHours"), c.getEstimatedMin(), c.getEstimatedMax());
@@ -270,9 +269,8 @@ public class TicketService {
 
         if (request.getStatus() != null && !request.getStatus().equals(ticket.getStatus())) {
             recordHistory(ticket, currentUser, "status",
-                ticket.getStatus().getDisplayName(),
-                request.getStatus().getDisplayName(), "STATUS_CHANGED");
-            if (request.getStatus() == TicketStatus.DONE || request.getStatus() == TicketStatus.CLOSED) {
+                ticket.getStatus(), request.getStatus(), "STATUS_CHANGED");
+            if (FINAL_STATUSES.contains(request.getStatus())) {
                 ticket.setResolvedAt(LocalDateTime.now());
             }
             ticket.setStatus(request.getStatus());
@@ -281,15 +279,13 @@ public class TicketService {
 
         if (request.getPriority() != null && !request.getPriority().equals(ticket.getPriority())) {
             recordHistory(ticket, currentUser, "priority",
-                ticket.getPriority().getDisplayName(),
-                request.getPriority().getDisplayName(), "UPDATED");
+                ticket.getPriority(), request.getPriority(), "UPDATED");
             ticket.setPriority(request.getPriority());
         }
 
         if (request.getType() != null && !request.getType().equals(ticket.getType())) {
             recordHistory(ticket, currentUser, "type",
-                ticket.getType().getDisplayName(),
-                request.getType().getDisplayName(), "UPDATED");
+                ticket.getType(), request.getType(), "UPDATED");
             ticket.setType(request.getType());
         }
 
@@ -307,7 +303,6 @@ public class TicketService {
             Long oldAssigneeId = ticket.getAssignee() != null ? ticket.getAssignee().getId() : null;
             if (!request.getAssigneeId().equals(oldAssigneeId)) {
                 User newAssignee = userService.findById(request.getAssigneeId());
-                // Store names instead of IDs
                 String oldName = ticket.getAssignee() != null ? ticket.getAssignee().getFullName() : "Unassigned";
                 String newName = newAssignee.getFullName();
                 recordHistory(ticket, currentUser, "assignee", oldName, newName, "UPDATED");

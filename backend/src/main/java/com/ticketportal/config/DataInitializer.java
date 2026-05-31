@@ -6,15 +6,13 @@ import com.ticketportal.entity.Role;
 import com.ticketportal.entity.Ticket;
 import com.ticketportal.entity.User;
 import com.ticketportal.entity.enums.ProjectStatus;
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import com.ticketportal.repository.LabelRepository;
 import com.ticketportal.repository.ProjectRepository;
 import com.ticketportal.repository.RoleRepository;
 import com.ticketportal.repository.TicketRepository;
 import com.ticketportal.repository.UserRepository;
 import com.ticketportal.service.SystemSettingService;
+import com.ticketportal.service.TicketConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -36,12 +34,14 @@ public class DataInitializer implements CommandLineRunner {
     private final TicketRepository ticketRepository;
     private final PasswordEncoder passwordEncoder;
     private final SystemSettingService systemSettingService;
+    private final TicketConfigService ticketConfigService;
 
     @Override
     @Transactional
     public void run(String... args) {
         initRoles();
         initUsers();
+        ticketConfigService.seedDefaults();   // seed status/priority/type configs before sample data
         initSampleData();
         systemSettingService.initializeDefaults();
         log.info("Data initialization complete.");
@@ -61,7 +61,7 @@ public class DataInitializer implements CommandLineRunner {
 
         if (!userRepository.existsByEmail("admin@ticketportal.com")) {
             Role adminRole = roleRepository.findByName(Role.ADMIN).orElseThrow();
-            User admin = User.builder()
+            userRepository.save(User.builder()
                     .username("admin")
                     .email("admin@ticketportal.com")
                     .password(password)
@@ -69,8 +69,7 @@ public class DataInitializer implements CommandLineRunner {
                     .lastName("Admin")
                     .active(true)
                     .roles(Set.of(adminRole))
-                    .build();
-            userRepository.save(admin);
+                    .build());
             log.info("Created admin user: admin@ticketportal.com / Admin@123");
         }
 
@@ -132,31 +131,31 @@ public class DataInitializer implements CommandLineRunner {
         ticketRepository.save(Ticket.builder()
                 .ticketNumber("TKT-1").title("Setup project infrastructure")
                 .description("Initialize the project with proper CI/CD pipeline")
-                .status(TicketStatus.DONE).priority(TicketPriority.HIGH).type(TicketType.TASK)
+                .status("DONE").priority("HIGH").type("TASK")
                 .project(project).reporter(admin).assignee(john).build());
 
         ticketRepository.save(Ticket.builder()
                 .ticketNumber("TKT-2").title("Implement authentication module")
                 .description("Create login, register, and JWT authentication endpoints")
-                .status(TicketStatus.IN_PROGRESS).priority(TicketPriority.HIGH).type(TicketType.FEATURE)
+                .status("IN_PROGRESS").priority("HIGH").type("FEATURE")
                 .project(project).reporter(jane).assignee(john).build());
 
         ticketRepository.save(Ticket.builder()
                 .ticketNumber("TKT-3").title("Design kanban board UI")
                 .description("Create a drag-and-drop kanban board for ticket management")
-                .status(TicketStatus.TODO).priority(TicketPriority.MEDIUM).type(TicketType.FEATURE)
+                .status("TODO").priority("MEDIUM").type("FEATURE")
                 .project(project).reporter(jane).assignee(john).build());
 
         ticketRepository.save(Ticket.builder()
                 .ticketNumber("TKT-4").title("Fix login page responsive issues")
                 .description("Login page is not rendering properly on mobile devices")
-                .status(TicketStatus.IN_REVIEW).priority(TicketPriority.HIGH).type(TicketType.BUG)
+                .status("IN_REVIEW").priority("HIGH").type("BUG")
                 .project(project).reporter(bob).assignee(john).build());
 
         ticketRepository.save(Ticket.builder()
                 .ticketNumber("TKT-5").title("Add email notification system")
                 .description("Implement email notifications for ticket assignments and updates")
-                .status(TicketStatus.TODO).priority(TicketPriority.LOW).type(TicketType.FEATURE)
+                .status("TODO").priority("LOW").type("FEATURE")
                 .project(project).reporter(admin).assignee(jane).build());
 
         log.info("Sample project and tickets created.");
