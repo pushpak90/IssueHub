@@ -6,24 +6,45 @@ import {
   Settings, X, Shield, Users as UsersIcon, CheckCircle2
 } from 'lucide-react'
 import { userService } from '../services/userService'
+import { adminService } from '../services/adminService'
 import api from '../services/api'
 import { getInitials, formatDate, timeAgo } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
-const ROLES = [
-  { value: 'ROLE_ADMIN',     label: 'Admin',     color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',         desc: 'Full system access' },
-  { value: 'ROLE_MANAGER',   label: 'Manager',   color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', desc: 'Manage projects, teams, assign tickets' },
-  { value: 'ROLE_DEVELOPER', label: 'Developer', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',     desc: 'Create & update tickets, comment' },
-  { value: 'ROLE_TESTER',    label: 'Tester',    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', desc: 'Test tickets, report bugs' },
-]
+const ROLE_STYLES = {
+  ROLE_ADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  ROLE_MANAGER: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  ROLE_DEVELOPER: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  ROLE_TESTER: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+}
 
-function RoleBadge({ role }) {
-  const config = ROLES.find(r => r.value === role) || { label: role.replace('ROLE_', ''), color: 'bg-gray-100 text-gray-600' }
+const formatRoleLabel = (roleName) => {
+  if (!roleName) return 'Role'
+  return roleName
+    .replace(/^ROLE_/, '')
+    .split('_')
+    .filter(Boolean)
+    .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+const normalizeRole = (role) => ({
+  value: role.name,
+  label: role.label || formatRoleLabel(role.name),
+  desc: role.description || 'Custom role',
+  color: ROLE_STYLES[role.name] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+})
+
+function RoleBadge({ role, roles = [] }) {
+  const config = roles.find(r => r.value === role) || {
+    label: formatRoleLabel(role),
+    color: ROLE_STYLES[role] || 'bg-gray-100 text-gray-600',
+  }
   return <span className={`badge text-xs ${config.color}`}>{config.label}</span>
 }
 
 // ── Manage User Modal ────────────────────────────────────────────────────────
-function ManageUserModal({ user, onClose }) {
+function ManageUserModal({ user, roles, rolesLoading, onClose }) {
   const queryClient = useQueryClient()
 
   // All teams to show team assignment
@@ -93,31 +114,41 @@ function ManageUserModal({ user, onClose }) {
               <Shield className="h-4 w-4 text-primary-600" />
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Assign Role</h3>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {ROLES.map(role => (
-                <button
-                  key={role.value}
-                  onClick={() => setSelectedRole(role.value)}
-                  className={`flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-all ${
-                    selectedRole === role.value
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    selectedRole === role.value ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
-                  }`}>
-                    {selectedRole === role.value && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
-                  </div>
-                  <div>
-                    <p className={`text-xs font-semibold ${selectedRole === role.value ? 'text-primary-700 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      {role.label}
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{role.desc}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {rolesLoading ? (
+              <div className="grid grid-cols-2 gap-2">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+                ))}
+              </div>
+            ) : roles.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No roles available</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {roles.map(role => (
+                  <button
+                    key={role.value}
+                    onClick={() => setSelectedRole(role.value)}
+                    className={`flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-all ${
+                      selectedRole === role.value
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                      selectedRole === role.value ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
+                    }`}>
+                      {selectedRole === role.value && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-semibold ${selectedRole === role.value ? 'text-primary-700 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {role.label}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{role.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {selectedRole !== currentRole && (
               <div className="mt-3 flex items-center justify-between rounded-xl bg-yellow-50 dark:bg-yellow-900/20 px-4 py-2.5">
@@ -202,16 +233,29 @@ export default function Users() {
     queryFn: () => userService.getAllUsers({ page, size: 15, search }),
   })
 
+  const { data: rolesData = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ['admin-roles'],
+    queryFn: adminService.getRoles,
+  })
+
   const toggleMutation = useMutation({
     mutationFn: userService.toggleUserStatus,
     onSuccess: () => { toast.success('Status updated'); queryClient.invalidateQueries(['users']) },
   })
 
   const users = data?.content || []
+  const roles = rolesData.map(normalizeRole)
 
   return (
     <div className="space-y-4">
-      {managingUser && <ManageUserModal user={managingUser} onClose={() => setManagingUser(null)} />}
+      {managingUser && (
+        <ManageUserModal
+          user={managingUser}
+          roles={roles}
+          rolesLoading={rolesLoading}
+          onClose={() => setManagingUser(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -272,7 +316,7 @@ export default function Users() {
                 {/* Role */}
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {user.roles?.map(r => <RoleBadge key={r} role={r} />)}
+                    {user.roles?.map(r => <RoleBadge key={r} role={r} roles={roles} />)}
                   </div>
                 </td>
 
