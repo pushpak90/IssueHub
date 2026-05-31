@@ -1,9 +1,6 @@
 package com.ticketportal.dto.request;
 
 import com.ticketportal.entity.enums.ProjectStatus;
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,9 +14,9 @@ public class TicketExplorerCriteria {
     private List<Long> projectIds;
     private List<Long> categoryIds;
     private List<ProjectStatus> projectStatuses;
-    private List<TicketStatus> statuses;
-    private List<TicketPriority> priorities;
-    private List<TicketType> types;
+    private List<String> statuses;
+    private List<String> priorities;
+    private List<String> types;
     private List<Long> assigneeIds;
     private List<Long> reporterIds;
     private List<Long> labelIds;

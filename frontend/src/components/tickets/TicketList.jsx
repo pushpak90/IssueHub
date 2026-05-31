@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, Filter, X } from 'lucide-react'
 import { ticketService } from '../../services/ticketService'
 import { userService } from '../../services/userService'
+import { configService } from '../../services/configService'
 import { getStatusConfig, getPriorityConfig, getTypeConfig, timeAgo, formatDate } from '../../utils/helpers'
 
 const isPrivileged = (user) =>
@@ -30,6 +31,23 @@ export default function TicketList({ projectId }) {
     queryKey: ['users-all'],
     queryFn: userService.getAllActiveUsers,
     enabled: privileged,
+  })
+
+  // Dynamic config
+  const { data: allStatuses = [] } = useQuery({
+    queryKey: ['ticket-statuses', projectId ?? 'global'],
+    queryFn: () => configService.getStatuses(projectId),
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: allTypes = [] } = useQuery({
+    queryKey: ['ticket-types'],
+    queryFn: configService.getTypes,
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: allPriorities = [] } = useQuery({
+    queryKey: ['ticket-priorities'],
+    queryFn: configService.getPriorities,
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data, isLoading } = useQuery({
@@ -75,8 +93,8 @@ export default function TicketList({ projectId }) {
           <select value={filters.status} onChange={e => setFilter('status', e.target.value)}
             className="input text-sm h-8 w-36">
             <option value="">All Status</option>
-            {['TODO','IN_PROGRESS','IN_REVIEW','TESTING','DONE','CLOSED','ON_HOLD','CANCELLED'].map(s => (
-              <option key={s} value={s}>{getStatusConfig(s).label}</option>
+            {allStatuses.map(s => (
+              <option key={s.name} value={s.name}>{s.displayName}</option>
             ))}
           </select>
 
@@ -84,8 +102,8 @@ export default function TicketList({ projectId }) {
           <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)}
             className="input text-sm h-8 w-36">
             <option value="">All Priority</option>
-            {['CRITICAL','HIGH','MEDIUM','LOW'].map(p => (
-              <option key={p} value={p}>{getPriorityConfig(p).label}</option>
+            {allPriorities.map(p => (
+              <option key={p.name} value={p.name}>{p.displayName}</option>
             ))}
           </select>
 
@@ -93,8 +111,8 @@ export default function TicketList({ projectId }) {
           <select value={filters.type} onChange={e => setFilter('type', e.target.value)}
             className="input text-sm h-8 w-36">
             <option value="">All Types</option>
-            {['BUG','FEATURE','TASK','IMPROVEMENT','EPIC','STORY','TEST','DOCUMENTATION'].map(t => (
-              <option key={t} value={t}>{getTypeConfig(t).label}</option>
+            {allTypes.map(t => (
+              <option key={t.name} value={t.name}>{t.displayName}</option>
             ))}
           </select>
 
@@ -178,9 +196,13 @@ export default function TicketList({ projectId }) {
                   </td>
                 </tr>
               ) : tickets.map(ticket => {
-                const status = getStatusConfig(ticket.status)
-                const priority = getPriorityConfig(ticket.priority)
-                const type = getTypeConfig(ticket.type)
+                // Dynamic config lookup with fallback to helpers
+                const statusCfg = allStatuses.find(s => s.name === ticket.status)
+                const priorityCfg = allPriorities.find(p => p.name === ticket.priority)
+                const typeCfg = allTypes.find(t => t.name === ticket.type)
+                const statusFallback = getStatusConfig(ticket.status)
+                const priorityFallback = getPriorityConfig(ticket.priority)
+                const typeFallback = getTypeConfig(ticket.type)
                 return (
                   <tr key={ticket.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -190,23 +212,38 @@ export default function TicketList({ projectId }) {
                     <td className="px-4 py-3 max-w-xs">
                       <Link to={`/tickets/${ticket.id}`}
                         className="flex items-center gap-2 hover:text-primary-600 group">
-                        <span className="text-base">{type.icon}</span>
+                        <span className="text-base">{typeCfg?.icon || typeFallback.icon}</span>
                         <span className="font-medium text-gray-900 dark:text-white group-hover:text-primary-600 truncate">
                           {ticket.title}
                         </span>
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`badge text-xs ${status.className}`}>{status.label}</span>
+                      {statusCfg ? (
+                        <span className="badge text-xs"
+                          style={{ backgroundColor: (statusCfg.color || '#6B7280') + '20', color: statusCfg.textColor || statusCfg.color || '#374151' }}>
+                          {statusCfg.displayName}
+                        </span>
+                      ) : (
+                        <span className={`badge text-xs ${statusFallback.className}`}>{statusFallback.label}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <div className={`h-2 w-2 rounded-full ${priority.dot}`} />
-                        <span className="text-xs text-gray-600 dark:text-gray-400">{priority.label}</span>
+                        <div className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: priorityCfg?.dotColor || undefined }}
+                          {...(!priorityCfg ? { className: `h-2 w-2 rounded-full ${priorityFallback.dot}` } : {})} />
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          {priorityCfg?.displayName || priorityFallback.label}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium ${type.className}`}>{type.label}</span>
+                      <span className="text-xs font-medium"
+                        style={{ color: typeCfg?.textColor || typeCfg?.color || undefined }}>
+                        {typeCfg?.icon && <span className="mr-1">{typeCfg.icon}</span>}
+                        {typeCfg?.displayName || typeFallback.label}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {ticket.assignee ? (

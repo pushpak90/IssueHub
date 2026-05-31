@@ -7,10 +7,9 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { ticketService } from '../../services/ticketService'
+import { configService } from '../../services/configService'
 import { getPriorityConfig, getTypeConfig, formatDate } from '../../utils/helpers'
-import { KANBAN_COLUMNS } from '../../utils/constants'
 import toast from 'react-hot-toast'
 
 // ── Single ticket card ───────────────────────────────────────────────────────
@@ -81,21 +80,20 @@ function SortableTicketCard({ ticket }) {
 }
 
 // ── Droppable Kanban column ───────────────────────────────────────────────────
-function KanbanColumn({ column, tickets }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id })
+function KanbanColumn({ colId, title, color, tickets }) {
+  const { setNodeRef, isOver } = useDroppable({ id: colId })
 
   return (
     <div className={`flex min-w-[270px] max-w-[270px] flex-col rounded-xl border
-      border-t-4 ${column.color}
-      border-gray-200 dark:border-gray-700
-      bg-gray-50/80 dark:bg-gray-900/40
-      transition-colors
+      border-t-4 border-gray-200 dark:border-gray-700
+      bg-gray-50/80 dark:bg-gray-900/40 transition-colors
       ${isOver ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300' : ''}
-    `}>
+    `}
+      style={{ borderTopColor: color || '#6B7280' }}>
       {/* Column header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm text-gray-900 dark:text-white">{column.title}</span>
+          <span className="font-semibold text-sm text-gray-900 dark:text-white">{title}</span>
           <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-300 font-medium px-1.5">
             {tickets.length}
           </span>
@@ -134,7 +132,15 @@ export default function KanbanBoard({ projectId }) {
   const queryClient = useQueryClient()
   const [activeTicket, setActiveTicket] = useState(null)
 
-  const { data, isLoading } = useQuery({
+  // Fetch dynamic statuses for this project (falls back to global if none defined)
+  // staleTime:0 ensures new statuses added by admin appear immediately
+  const { data: statuses = [], isLoading: statusLoading } = useQuery({
+    queryKey: ['ticket-statuses', projectId ?? 'global'],
+    queryFn: () => configService.getStatuses(projectId),
+    staleTime: 0,
+  })
+
+  const { data, isLoading: ticketsLoading } = useQuery({
     queryKey: ['tickets', 'project', projectId],
     queryFn: () => ticketService.getProjectTickets(projectId, { size: 200 }),
   })
@@ -150,7 +156,7 @@ export default function KanbanBoard({ projectId }) {
   )
 
   const tickets = data?.content || []
-  const getColumnTickets = (status) => tickets.filter(t => t.status === status)
+  const getColumnTickets = (statusName) => tickets.filter(t => t.status === statusName)
 
   const handleDragStart = ({ active }) => {
     const found = tickets.find(t => t.id === active.id || t.id === Number(active.id))
@@ -165,30 +171,28 @@ export default function KanbanBoard({ projectId }) {
     const ticket = tickets.find(t => t.id === activeId)
     if (!ticket) return
 
-    // Check if dropped directly onto a column
-    const overColumn = KANBAN_COLUMNS.find(col => col.id === over.id)
+    // Dropped onto a column header (droppable id = status name)
+    const overColumn = statuses.find(s => s.name === over.id)
     if (overColumn) {
-      if (ticket.status !== overColumn.id) {
-        updateMutation.mutate({ id: ticket.id, status: overColumn.id })
-      }
+      if (ticket.status !== overColumn.name)
+        updateMutation.mutate({ id: ticket.id, status: overColumn.name })
       return
     }
 
-    // Check if dropped onto another ticket — use that ticket's column
+    // Dropped onto another ticket — move to that ticket's status
     const overId = typeof over.id === 'string' ? Number(over.id) : over.id
     const overTicket = tickets.find(t => t.id === overId)
-    if (overTicket && ticket.status !== overTicket.status) {
+    if (overTicket && ticket.status !== overTicket.status)
       updateMutation.mutate({ id: ticket.id, status: overTicket.status })
-    }
   }
 
-  const handleDragCancel = () => setActiveTicket(null)
+  const isLoading = statusLoading || ticketsLoading
 
   if (isLoading) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {KANBAN_COLUMNS.map(col => (
-          <div key={col.id} className="min-w-[270px] h-96 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="min-w-[270px] h-96 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
         ))}
       </div>
     )
@@ -200,14 +204,16 @@ export default function KanbanBoard({ projectId }) {
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
+      onDragCancel={() => setActiveTicket(null)}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {KANBAN_COLUMNS.map(column => (
+        {statuses.map(s => (
           <KanbanColumn
-            key={column.id}
-            column={column}
-            tickets={getColumnTickets(column.id)}
+            key={s.name}
+            colId={s.name}
+            title={s.displayName}
+            color={s.color}
+            tickets={getColumnTickets(s.name)}
           />
         ))}
       </div>

@@ -4,7 +4,6 @@ import com.ticketportal.entity.Project;
 import com.ticketportal.entity.Sprint;
 import com.ticketportal.entity.Ticket;
 import com.ticketportal.entity.enums.SprintStatus;
-import com.ticketportal.entity.enums.TicketStatus;
 import com.ticketportal.exception.BadRequestException;
 import com.ticketportal.exception.ResourceNotFoundException;
 import com.ticketportal.repository.ProjectRepository;
@@ -97,7 +96,7 @@ public class SprintService {
         }
         // Move incomplete tickets back to backlog
         for (Ticket ticket : sprint.getTickets()) {
-            if (ticket.getStatus() != TicketStatus.DONE && ticket.getStatus() != TicketStatus.CLOSED) {
+            if (!"DONE".equals(ticket.getStatus()) && !"CLOSED".equals(ticket.getStatus())) {
                 ticket.setSprint(null);
                 ticketRepository.save(ticket);
             }

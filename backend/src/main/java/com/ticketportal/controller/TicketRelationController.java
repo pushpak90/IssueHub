@@ -100,7 +100,7 @@ public class TicketRelationController {
         m.put("otherTicketId",     other.getId());
         m.put("otherTicketNumber", other.getTicketNumber());
         m.put("otherTicketTitle",  other.getTitle());
-        m.put("otherTicketStatus", other.getStatus().name());
+        m.put("otherTicketStatus", other.getStatus());
         m.put("createdAt",     r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
         return m;
     }

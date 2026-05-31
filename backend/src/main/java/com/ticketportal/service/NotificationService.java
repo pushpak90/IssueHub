@@ -78,7 +78,7 @@ public class NotificationService {
         createNotification(
             ticket.getReporter(),
             "Ticket Status Updated",
-            ticket.getTicketNumber() + " status changed to: " + ticket.getStatus().getDisplayName(),
+            ticket.getTicketNumber() + " status changed to: " + ticket.getStatus(),
             NotificationType.TICKET_STATUS_CHANGED,
             ticket.getId(), "TICKET"
         );

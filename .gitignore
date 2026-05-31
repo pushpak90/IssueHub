@@ -1,14 +1,22 @@
 # ==========================================
+<<<<<<< HEAD
 # React / Vite Frontend
+=======
+# React / Vite
+>>>>>>> Development
 # ==========================================
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+
+# Environment Variables
 frontend/.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.production.local
 
 # ==========================================
+<<<<<<< HEAD
 # Spring Boot / Gradle Backend
 # ==========================================
 backend/build/
@@ -23,6 +31,37 @@ backend-run.log
 # ==========================================
 # VS Code
 # ==========================================
+=======
+# Spring Boot / Gradle
+# ==========================================
+backend/.gradle/
+backend/build/
+backend/bin/
+backend/out/
+
+# Gradle Wrapper Logs
+backend/gradle-app.setting
+
+# ==========================================
+# Java Compiled Files
+# ==========================================
+*.class
+*.jar
+*.war
+*.ear
+
+# ==========================================
+# Logs
+# ==========================================
+*.log
+logs/
+backend/logs/
+
+# ==========================================
+# IDE Files
+# ==========================================
+.idea/
+>>>>>>> Development
 .vscode/
 
 # ==========================================
@@ -30,20 +69,62 @@ backend-run.log
 # ==========================================
 .idea/
 *.iml
+*.ipr
+*.iws
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
 
 # ==========================================
-# Claude
-# ==========================================
-.claude/
-
-# ==========================================
-# Operating System Files
+# OS Files
 # ==========================================
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # ==========================================
 # Temporary Files
 # ==========================================
 *.tmp
+*.temp
 *.swp
+*.swo
+*~
+
+# ==========================================
+# Test & Coverage Reports
+# ==========================================
+coverage/
+.nyc_output/
+
+# ==========================================
+# Mac/Linux Files
+# ==========================================
+.AppleDouble
+.LSOverride
+
+# ==========================================
+# Windows Files
+# ==========================================
+ehthumbs.db
+
+# ==========================================
+# Miscellaneous
+# ==========================================
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================================
+# Generated Spring Boot Files
+# ==========================================
+target/

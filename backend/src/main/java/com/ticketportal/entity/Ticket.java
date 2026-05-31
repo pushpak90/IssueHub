@@ -1,8 +1,5 @@
 package com.ticketportal.entity;
 
-import com.ticketportal.entity.enums.TicketPriority;
-import com.ticketportal.entity.enums.TicketStatus;
-import com.ticketportal.entity.enums.TicketType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -45,20 +42,17 @@ public class Ticket {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private TicketStatus status = TicketStatus.TODO;
+    private String status = "TODO";
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private TicketPriority priority = TicketPriority.MEDIUM;
+    private String priority = "MEDIUM";
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private TicketType type = TicketType.TASK;
+    private String type = "TASK";
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)

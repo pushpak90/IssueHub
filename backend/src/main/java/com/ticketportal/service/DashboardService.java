@@ -3,7 +3,7 @@ package com.ticketportal.service;
 import com.ticketportal.dto.response.DashboardStatsResponse;
 import com.ticketportal.entity.Project;
 import com.ticketportal.entity.User;
-import com.ticketportal.entity.enums.TicketStatus;
+
 import com.ticketportal.repository.ProjectRepository;
 import com.ticketportal.repository.TicketRepository;
 import com.ticketportal.repository.UserRepository;
@@ -34,11 +34,7 @@ public class DashboardService {
         long totalProjects = projectRepository.count();
         long totalUsers = userRepository.count();
 
-        // Count tickets by status across all projects
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        for (TicketStatus s : TicketStatus.values()) {
-            byStatus.put(s.name(), 0L);
-        }
 
         List<Project> projects = isAdmin
             ? projectRepository.findAll()
@@ -47,9 +43,9 @@ public class DashboardService {
         long totalCount = 0, openCount = 0, inProgressCount = 0, resolvedCount = 0;
         for (Project p : projects) {
             totalCount += ticketRepository.countByProject(p);
-            openCount += ticketRepository.countByProjectAndStatus(p, TicketStatus.TODO);
-            inProgressCount += ticketRepository.countByProjectAndStatus(p, TicketStatus.IN_PROGRESS);
-            resolvedCount += ticketRepository.countByProjectAndStatus(p, TicketStatus.DONE);
+            openCount += ticketRepository.countByProjectAndStatus(p, "TODO");
+            inProgressCount += ticketRepository.countByProjectAndStatus(p, "IN_PROGRESS");
+            resolvedCount += ticketRepository.countByProjectAndStatus(p, "DONE");
         }
 
         long overdueCount = ticketRepository.findOverdueTicketsByAssignee(currentUser, LocalDate.now()).size();

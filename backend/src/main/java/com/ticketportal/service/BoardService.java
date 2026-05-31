@@ -121,15 +121,10 @@ public class BoardService {
         Board board = getBoard(boardId);
         String searchTerm = (search != null && !search.isBlank()) ? search : "";
 
-        com.ticketportal.entity.enums.TicketStatus statusEnum = null;
-        com.ticketportal.entity.enums.TicketPriority priorityEnum = null;
-        try { if (status   != null) statusEnum   = com.ticketportal.entity.enums.TicketStatus.valueOf(status); } catch (Exception ignored) {}
-        try { if (priority != null) priorityEnum = com.ticketportal.entity.enums.TicketPriority.valueOf(priority); } catch (Exception ignored) {}
-
         List<TicketResponse> result = new ArrayList<>();
         for (Project project : board.getProjects()) {
             var page = ticketRepository.findTicketsWithFilters(
-                project, statusEnum, priorityEnum, null, null, searchTerm,
+                project, status, priority, null, null, searchTerm,
                 PageRequest.of(0, 500, Sort.by("createdAt").descending())
             );
             page.getContent().stream().map(ticketService::toResponse).forEach(result::add);
