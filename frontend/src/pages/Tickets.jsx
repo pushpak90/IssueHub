@@ -391,7 +391,7 @@ function GlobalTicketList({ filters, onFilterChange, privileged, currentUserId, 
           <select value={filters.status} onChange={e => onFilterChange('status', e.target.value)}
             className="input text-sm h-8 w-36">
             <option value="">All Status</option>
-            {['TODO','IN_PROGRESS','IN_REVIEW','TESTING','DONE','CLOSED'].map(s => (
+            {['TODO','IN_PROGRESS','IN_REVIEW','TESTING','DONE','CLOSED','CANCELLED'].map(s => (
               <option key={s} value={s}>{getStatusConfig(s).label}</option>
             ))}
           </select>

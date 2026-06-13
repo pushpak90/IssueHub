@@ -28,8 +28,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     Page<Ticket> findByReporter(User reporter, Pageable pageable);
 
+    @Query("SELECT t FROM Ticket t WHERE t.assignee = :assignee AND t.status NOT IN ('DONE', 'CLOSED', 'CANCELLED')")
+    Page<Ticket> findOpenByAssignee(@Param("assignee") User assignee, Pageable pageable);
+
     @Query("SELECT t FROM Ticket t WHERE t.project = :project AND " +
         "(:status IS NULL OR t.status = :status) AND " +
+        "(:status IS NOT NULL OR t.status NOT IN ('DONE', 'CLOSED', 'CANCELLED')) AND " +
         "(:priority IS NULL OR t.priority = :priority) AND " +
         "(:type IS NULL OR t.type = :type) AND " +
         "(:assigneeId IS NULL OR t.assignee.id = :assigneeId) AND " +
@@ -59,6 +63,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     @Query("SELECT t FROM Ticket t WHERE " +
         "(:projectId IS NULL OR t.project.id = :projectId) AND " +
         "(:status IS NULL OR t.status = :status) AND " +
+        "(:status IS NOT NULL OR t.status NOT IN ('DONE', 'CLOSED', 'CANCELLED')) AND " +
         "(:priority IS NULL OR t.priority = :priority) AND " +
         "(:assigneeId IS NULL OR t.assignee.id = :assigneeId) AND " +
         "(LOWER(t.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +

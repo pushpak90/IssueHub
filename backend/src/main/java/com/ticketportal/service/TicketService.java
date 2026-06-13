@@ -253,7 +253,7 @@ public class TicketService {
     public PagedResponse<TicketResponse> getMyTickets(int page, int size) {
         User user = userService.getCurrentUser();
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return toPagedResponse(ticketRepository.findByAssignee(user, pageable));
+        return toPagedResponse(ticketRepository.findOpenByAssignee(user, pageable));
     }
 
     @Transactional
