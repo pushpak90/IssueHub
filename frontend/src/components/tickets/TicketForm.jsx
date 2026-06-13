@@ -72,7 +72,7 @@ export default function TicketForm({ projectId: initialProjectId, onClose, exist
   }
 
   // ── Form ──────────────────────────────────────────────────────────────────
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, watch, formState: { errors } } = useForm({
     defaultValues: existingTicket ? {
       title:          existingTicket.title          || '',
       description:    existingTicket.description    || '',
@@ -83,7 +83,8 @@ export default function TicketForm({ projectId: initialProjectId, onClose, exist
       dueDate:        existingTicket.dueDate         || '',
       estimatedHours: existingTicket.estimatedHours  ?? '',
       resolutionNote: existingTicket.resolutionNote  || '',
-    } : { priority: 'MEDIUM', type: 'TASK' }
+      labelIds:       existingTicket.labels?.map(l => String(l.id)) || [],
+    } : { priority: 'MEDIUM', type: 'TASK', labelIds: [] }
   })
 
   const { data: projectsData } = useQuery({
@@ -99,12 +100,24 @@ export default function TicketForm({ projectId: initialProjectId, onClose, exist
     queryFn: userService.getAllActiveUsers,
   })
 
+  const { data: projectLabels = [] } = useQuery({
+    queryKey: ['labels', selectedProjectId],
+    queryFn: () => projectService.getProjectLabels(selectedProjectId),
+    enabled: !!selectedProjectId,
+  })
+
+  const selectedLabelIds = watch('labelIds') || []
+
   const mutation = useMutation({
     mutationFn: async (data) => {
+      const payload = {
+        ...data,
+        labelIds: (data.labelIds || []).map(Number),
+      }
       // 1. Update / create ticket
       const result = existingTicket
-        ? await ticketService.updateTicket(existingTicket.id, data)
-        : await ticketService.createTicket({ ...data, projectId: selectedProjectId })
+        ? await ticketService.updateTicket(existingTicket.id, payload)
+        : await ticketService.createTicket({ ...payload, projectId: selectedProjectId })
 
       const ticketId = existingTicket?.id || result?.id
       if (!ticketId) return result
@@ -252,6 +265,41 @@ export default function TicketForm({ projectId: initialProjectId, onClose, exist
               </div>
             )}
           </div>
+
+          {selectedProjectId && projectLabels.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tags / Labels
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {projectLabels.map(label => {
+                  const checked = selectedLabelIds.includes(String(label.id))
+                  return (
+                    <label
+                      key={label.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        checked
+                          ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        value={String(label.id)}
+                        {...register('labelIds')}
+                        className="sr-only"
+                      />
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: label.color || '#6B7280' }}
+                      />
+                      {label.name}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Attachments for new tickets. Existing ticket files are managed from the Attachments tab. */}
           {!existingTicket && (
