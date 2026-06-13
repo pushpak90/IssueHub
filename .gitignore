@@ -1,5 +1,9 @@
 # ==========================================
+<<<<<<< HEAD
+# React / Vite Frontend
+=======
 # React / Vite
+>>>>>>> Development
 # ==========================================
 frontend/node_modules/
 frontend/dist/
@@ -12,6 +16,22 @@ frontend/.env.development.local
 frontend/.env.production.local
 
 # ==========================================
+<<<<<<< HEAD
+# Spring Boot / Gradle Backend
+# ==========================================
+backend/build/
+backend/.gradle/
+backend/bin/
+backend/uploads/
+
+# Logs
+*.log
+backend-run.log
+
+# ==========================================
+# VS Code
+# ==========================================
+=======
 # Spring Boot / Gradle
 # ==========================================
 backend/.gradle/
@@ -41,7 +61,13 @@ backend/logs/
 # IDE Files
 # ==========================================
 .idea/
+>>>>>>> Development
 .vscode/
+
+# ==========================================
+# IntelliJ IDEA
+# ==========================================
+.idea/
 *.iml
 *.ipr
 *.iws
