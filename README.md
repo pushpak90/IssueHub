@@ -10,7 +10,7 @@ IssueHub is a full-stack ticket and project management portal for software teams
 - Spring Boot 3.2.3
 - Spring Security with JWT authentication
 - Spring Data JPA / Hibernate
-- MySQL 8
+- PostgreSQL
 - Gradle Wrapper
 - Lombok
 - ModelMapper
@@ -51,7 +51,7 @@ IssueHub is a full-stack ticket and project management portal for software teams
 Install these before running the project:
 
 - Java JDK 21
-- MySQL 8.x
+- PostgreSQL 14 or newer
 - Node.js 20 or newer
 - npm
 
@@ -59,23 +59,30 @@ The backend includes the Gradle Wrapper, so a separate Gradle install is usually
 
 ## Database Setup
 
-Create the MySQL database:
+Create the local PostgreSQL database:
 
 ```sql
-CREATE DATABASE IF NOT EXISTS ticket_portal_db
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE issuehub;
 ```
 
-The default backend configuration uses:
+The backend reads production values from system environment variables. Render should keep these variables configured there:
 
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/ticket_portal_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-spring.datasource.username=root
+DB_URL=jdbc:postgresql://...
+DB_USERNAME=...
+DB_PASSWORD=...
+JWT_SECRET=...
+```
+
+For local development, if those variables are not set, the backend falls back to:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/issuehub
+spring.datasource.username=postgres
 spring.datasource.password=Admin@123
 ```
 
-Update `backend/src/main/resources/application.properties` if your local MySQL credentials are different.
+If your local PostgreSQL database name or user is different, set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` on your machine instead of editing `application.properties`.
 
 ## Backend Setup
 
@@ -265,11 +272,11 @@ IssueHub/
 
 ## Troubleshooting
 
-### Backend cannot connect to MySQL
+### Backend cannot connect to PostgreSQL
 
-- Make sure MySQL is running.
-- Confirm that `ticket_portal_db` exists or that the configured user can create databases.
-- Check `spring.datasource.username` and `spring.datasource.password`.
+- Make sure PostgreSQL is running.
+- Confirm that the local `issuehub` database exists, or set `DB_URL` to your local database.
+- Check `DB_USERNAME` and `DB_PASSWORD`, or use the default `postgres` / `Admin@123` local setup.
 
 ### Frontend cannot reach the API
 
@@ -287,6 +294,6 @@ http://localhost:8080/api/swagger-ui.html
 
 ### Login fails for seeded users
 
-- Make sure the backend started successfully and connected to MySQL.
+- Make sure the backend started successfully and connected to PostgreSQL.
 - Check whether existing database data already contains different users.
-- For a fresh local seed, use an empty `ticket_portal_db` database and restart the backend.
+- For a fresh local seed, use an empty `issuehub` database and restart the backend.
