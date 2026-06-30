@@ -260,20 +260,20 @@ VITE_API_BASE_URL=http://localhost:8080/api
 
 Add screenshots here:
 
-## Dashboard
-![Dashboard](Images/dashboard.png)
-
 ## Login
 ![Login](Images/Login.png)
+
+## Dashboard
+![Dashboard](Images/dashboard.png)
 
 ## Project
 ![Project](Images/project.png)
 
-## Report
-![Report](Images/report.png)
-
 ## Ticket
 ![Ticket](Images/ticket.png)
+
+## Report
+![Report](Images/report.png)
 
 ------------------------------------------------------------------------
 
